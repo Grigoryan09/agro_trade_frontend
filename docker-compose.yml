@@ -1,0 +1,49 @@
+# Serves both Angular build targets behind nginx.
+# The backend microservices are expected to be reachable on the shared
+# `agro-net` network (run them here too, or attach an existing external
+# network). Upstream hosts are overridable via the *_HOST env vars.
+
+services:
+  storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP: agro_trade_frontend
+    image: agro-trade/storefront:latest
+    ports:
+      - "8080:80"
+    environment:
+      API_HOST: ${API_HOST:-agro-trade-api:8080}
+      CHAT_HOST: ${CHAT_HOST:-chat-service:8081}
+      DOCUMENT_HOST: ${DOCUMENT_HOST:-document-service:8083}
+      BANKING_HOST: ${BANKING_HOST:-banking-service:8084}
+      SOCKET_HOST: ${SOCKET_HOST:-socket-service:9093}
+    networks: [agro-net]
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP: agro_trade_admin
+    image: agro-trade/admin:latest
+    ports:
+      - "8090:80"
+    environment:
+      API_HOST: ${API_HOST:-agro-trade-api:8080}
+      CHAT_HOST: ${CHAT_HOST:-chat-service:8081}
+      DOCUMENT_HOST: ${DOCUMENT_HOST:-document-service:8083}
+      BANKING_HOST: ${BANKING_HOST:-banking-service:8084}
+      SOCKET_HOST: ${SOCKET_HOST:-socket-service:9093}
+    networks: [agro-net]
+    restart: unless-stopped
+
+networks:
+  agro-net:
+    driver: bridge
+    # To reach backends that already run in another compose project, replace
+    # the two lines above with:
+    #   external: true
+    #   name: <that-project's-network>
