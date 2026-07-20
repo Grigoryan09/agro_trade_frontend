@@ -19,7 +19,7 @@ services:
       CHAT_HOST: ${CHAT_HOST:-chat_service:8081}
       DOCUMENT_HOST: ${DOCUMENT_HOST:-document-service:8083}
       BANKING_HOST: ${BANKING_HOST:-banking_service_app:8084}
-      SOCKET_HOST: ${SOCKET_HOST:-agro_trade-web-1:9093}
+      SOCKET_HOST: ${SOCKET_HOST:-chat_service:9093}
     networks: [agro_trade_default]
     restart: unless-stopped
 
@@ -37,7 +37,7 @@ services:
       CHAT_HOST: ${CHAT_HOST:-chat_service:8081}
       DOCUMENT_HOST: ${DOCUMENT_HOST:-document-service:8083}
       BANKING_HOST: ${BANKING_HOST:-banking_service_app:8084}
-      SOCKET_HOST: ${SOCKET_HOST:-agro_trade-web-1:9093}
+      SOCKET_HOST: ${SOCKET_HOST:-chat_service:9093}
     networks: [agro_trade_default]
     restart: unless-stopped
 

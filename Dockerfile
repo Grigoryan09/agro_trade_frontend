@@ -25,6 +25,13 @@ FROM nginx:1.27-alpine AS runtime
 
 # nginx template is rendered by the official image's envsubst entrypoint,
 # so backend upstreams are configurable at container start (see compose).
+#
+# By default that entrypoint substitutes EVERY environment variable, which would
+# clobber any nginx runtime var whose name happens to collide with one ($host vs
+# a HOST env var, etc.). Restrict substitution to exactly the five upstream vars
+# so $http_upgrade / $host / $uri / $request_uri always survive rendering.
+ENV NGINX_ENVSUBST_FILTER="^(API|CHAT|DOCUMENT|BANKING|SOCKET)_HOST$"
+
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/site /usr/share/nginx/html
 
