@@ -10,6 +10,7 @@ import { ContractDto } from '../../core/models/banking.models';
 import { ORDER_STATUSES, OrderStatus, ROLES, Role } from '../../core/models/enums';
 import { AppError } from '../../core/models/api.models';
 import { appErrorOf, formatMoney } from '../../core/util/format';
+import { resolveMediaUrl } from '../../core/util/media-url';
 import { DrawerComponent } from '../../shared/drawer.component';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmService } from '../../shared/confirm.service';
@@ -249,8 +250,8 @@ type Tab = 'orders' | 'users' | 'products' | 'news' | 'organizations' | 'contrac
                       </span>
                     </td>
                     <td class="actions">
-                      @if (c.documentUrl) {
-                        <a class="btn btn-ghost btn-sm" [href]="c.documentUrl" target="_blank" rel="noopener" download>
+                      @if (docUrl(c); as href) {
+                        <a class="btn btn-ghost btn-sm" [href]="href" target="_blank" rel="noopener" download>
                           Скачать
                         </a>
                       }
@@ -560,6 +561,10 @@ export class AdminComponent {
   }
 
   // ---- contracts ----
+  docUrl(c: ContractDto): string | null {
+    return resolveMediaUrl(c.documentUrl);
+  }
+
   isCompleted(c: ContractDto): boolean {
     return c.documentStatus === 'COMPLETED' || !!c.documentUrl;
   }

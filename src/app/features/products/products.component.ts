@@ -7,6 +7,7 @@ import { ProductInfo } from '../../core/models/product.models';
 import { Media } from '../../core/models/media.models';
 import { AppError } from '../../core/models/api.models';
 import { appErrorOf, formatMoney } from '../../core/util/format';
+import { firstMediaUrl } from '../../core/util/media-url';
 import { DrawerComponent } from '../../shared/drawer.component';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmService } from '../../shared/confirm.service';
@@ -90,7 +91,7 @@ import { PRODUCT_CREATE_ROLES, categoryLabel } from '../../core/models/enums';
           } @else {
             @for (p of visible(); track p.id) {
               <article class="card product-card">
-                @if (p.media?.[0]?.url; as img) {
+                @if (thumb(p); as img) {
                   <div class="product-thumb"><img [src]="img" [alt]="p.name" /></div>
                 } @else {
                   <div class="product-thumb">🌾</div>
@@ -388,6 +389,10 @@ export class ProductsComponent {
   }
 
   // ---- create/edit product (PRODUCT_CREATE_ROLES; edit only own) ----
+  thumb(p: ProductInfo): string | null {
+    return firstMediaUrl(p.media);
+  }
+
   canCreate(): boolean {
     const r = this.auth.role();
     return !!r && this.createRoles.includes(r);

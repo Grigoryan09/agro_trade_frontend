@@ -15,6 +15,7 @@ import { ChatLauncherService, ChatContext, orderParties } from './chat-launcher.
 import { ChatDetail, ChatMessage, ChatParty } from './chat.models';
 import { ROLE_LABEL } from '../core/models/enums';
 import { AuthService } from '../core/services/auth.service';
+import { resolveMediaUrl } from '../core/util/media-url';
 import { OrderService } from '../core/services/order.service';
 import { userIdFromToken } from '../core/util/jwt';
 import { TokenService } from '../core/services/token.service';
@@ -466,8 +467,10 @@ export class ChatWindowComponent {
     const text = m.message ?? '';
     const match = text.match(/https?:\/\/\S+/);
     if (!match) return null;
-    const url = match[0];
-    const name = text.replace(url, '').trim() || 'Документ';
+    const raw = match[0];
+    const name = text.replace(raw, '').trim() || 'Документ';
+    const url = resolveMediaUrl(raw);
+    if (!url) return null;
     return { name, url };
   }
 
