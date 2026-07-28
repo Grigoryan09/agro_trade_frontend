@@ -11,7 +11,7 @@ import { firstMediaUrl } from '../../core/util/media-url';
 import { DrawerComponent } from '../../shared/drawer.component';
 import { ToastService } from '../../shared/toast.service';
 import { ConfirmService } from '../../shared/confirm.service';
-import { ChatLauncherService } from '../../chat/chat-launcher.service';
+import { ChatLauncherService, orderChatContext } from '../../chat/chat-launcher.service';
 import { AuthService } from '../../core/services/auth.service';
 import { HasRoleDirective } from '../../core/directives/has-role.directive';
 import { PRODUCT_CREATE_ROLES, categoryLabel } from '../../core/models/enums';
@@ -564,6 +564,7 @@ export class ProductsComponent {
     if (this.isOwn(p)) return;
     const sellerId = Number(p.sellerInfoDto.sellerId);
     this.chat.open({
+      kind: 'direct',
       sellerId,
       sellerName: p.sellerInfoDto.sellerName,
       title: `Чат с ${p.sellerInfoDto.sellerName}`,
@@ -603,16 +604,15 @@ export class ProductsComponent {
         price: p.price,
       })
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.orderSaving.set(false);
           this.closeOrder();
-          // Backend auto-creates a chat for the order; open it for the buyer.
-          const sellerId = Number(p.sellerInfoDto.sellerId);
-          this.chat.open({
-            sellerId,
-            title: 'Чат по заказу',
-            parties: [{ userId: sellerId, role: 'SELLER', name: p.sellerInfoDto.sellerName }],
-          });
+          this.toast.success('Заказ оформлен');
+          // The backend creates the order's GROUP chat (покупатель + продавец +
+          // менеджер) itself — only open it. Opening a seller context here made the
+          // window create a second, ONE_TO_ONE chat alongside it.
+          const order = created[0];
+          if (order?.id != null) this.chat.open(orderChatContext(order));
         },
         error: (err) => {
           this.orderSaving.set(false);

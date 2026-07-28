@@ -7,6 +7,13 @@ export type { ChatParty } from './chat.models';
 
 /** Context that opens a chat (from a product card or an order). */
 export interface ChatContext {
+  /**
+   * Which of the two chats this is. `order` = the GROUP chat (buyer + seller +
+   * manager) the **backend** creates together with the order — the FE only opens
+   * it by id and must never POST /chats for it. `direct` = the ONE_TO_ONE
+   * buyer↔seller chat behind "Связаться с продавцом", the only chat the FE creates.
+   */
+  kind?: 'order' | 'direct';
   /** The other participant (seller) user id, when starting a chat from a product. */
   sellerId?: number;
   sellerName?: string;
@@ -65,6 +72,7 @@ export function orderParties(o: OrderDetails): ChatParty[] {
 
 export function orderChatContext(o: OrderDetails): ChatContext {
   return {
+    kind: 'order',
     chatId: o.chatId,
     orderId: o.id,
     buyerId: numericId(o.buyerDetailsDto?.buyerId),

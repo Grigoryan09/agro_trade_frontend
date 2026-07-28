@@ -12,8 +12,8 @@ import { ChatService } from './chat.service';
 import { ChatSocketService } from './chat-socket.service';
 import { ChatRegistryService } from './chat-registry.service';
 import { ChatLauncherService, ChatContext, orderParties } from './chat-launcher.service';
-import { ChatDetail, ChatMessage, ChatParty } from './chat.models';
-import { ROLE_LABEL } from '../core/models/enums';
+import { ChatDetail, ChatMessage, ChatParty, ChatSummary } from './chat.models';
+import { ChatType, ROLE_LABEL } from '../core/models/enums';
 import { AuthService } from '../core/services/auth.service';
 import { resolveMediaUrl } from '../core/util/media-url';
 import { OrderService } from '../core/services/order.service';
@@ -25,6 +25,13 @@ import { appErrorOf } from '../core/util/format';
 /** A usable backend id: a finite positive number (rejects undefined/null/NaN/0). */
 function isValidId(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0;
+}
+
+/** True for an active ONE_TO_ONE chat whose members are exactly these two users. */
+function isDirectChatWith(c: ChatSummary, me: number, other: number): boolean {
+  if (c.chatType !== 'ONE_TO_ONE' || c.chatStatus === 'ARCHIVED') return false;
+  const ids = new Set((c.members ?? []).map((m) => m.userId).filter(isValidId));
+  return ids.size === 2 && ids.has(me) && ids.has(other);
 }
 
 function mergeParties(base: ChatParty[], extra: ChatParty[]): ChatParty[] {
@@ -240,18 +247,19 @@ export class ChatWindowComponent {
           this.openChat(ctx.chatId);
           return;
         }
-        if (ctx.orderId != null) {
-          this.loading.set(false);
-          this.error.set({ status: 0, message: 'Чат по этому заказу ещё не готов.' });
+        // An order's chat is the GROUP chat the backend creates with the order —
+        // resolve it by order id, never create one here.
+        if (ctx.kind === 'order' || ctx.orderId != null) {
+          this.openOrderChat(ctx.orderId);
           return;
         }
-        const participants = this.participantsFrom(ctx, me);
-        if (participants.length >= 2) {
-          this.createAndOpen(participants);
-        } else {
-          this.loading.set(false);
-          this.error.set({ status: 0, message: 'Недостаточно данных для открытия чата.' });
+        // "Связаться с продавцом" — strictly the ONE_TO_ONE buyer↔seller chat.
+        if (isValidId(ctx.sellerId)) {
+          this.openDirectChat(me, ctx.sellerId);
+          return;
         }
+        this.loading.set(false);
+        this.error.set({ status: 0, message: 'Недостаточно данных для открытия чата.' });
       });
   }
 
@@ -265,14 +273,61 @@ export class ChatWindowComponent {
     return null;
   }
 
-  private participantsFrom(ctx: ChatContext, me: number): number[] {
-    const parties = [ctx.buyerId, ctx.sellerId, ctx.managerId].filter(isValidId);
-    if (parties.length >= 2) return Array.from(new Set(parties));
-    return isValidId(ctx.sellerId) ? Array.from(new Set([me, ctx.sellerId])) : [];
+  /** Opens the order's backend-created GROUP chat. Never creates a chat. */
+  private openOrderChat(orderId: number | undefined): void {
+    if (!isValidId(orderId)) {
+      this.loading.set(false);
+      this.error.set({ status: 0, message: 'Чат по этому заказу ещё не готов.' });
+      return;
+    }
+    this.orders
+      .byId(orderId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (order) => {
+          if (isValidId(order?.chatId)) {
+            this.openChat(order.chatId);
+            return;
+          }
+          this.loading.set(false);
+          this.error.set({ status: 0, message: 'Чат по этому заказу ещё не готов.' });
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.error.set(appErrorOf(err, 'Не удалось открыть чат по заказу'));
+        },
+      });
   }
 
-  private createAndOpen(participants: number[]): void {
-    const chatType = participants.length > 2 ? 'GROUP' : 'ONE_TO_ONE';
+  /**
+   * Opens the ONE_TO_ONE chat with a seller, reusing the existing one when the
+   * backend already has it so repeated "Связаться с продавцом" clicks don't pile
+   * up duplicates.
+   */
+  private openDirectChat(me: number, sellerId: number): void {
+    if (me === sellerId) {
+      this.loading.set(false);
+      this.error.set({ status: 0, message: 'Нельзя открыть чат с самим собой.' });
+      return;
+    }
+    this.chatSvc
+      .myChats(me)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (chats) => {
+          const existing = chats.find((c) => isDirectChatWith(c, me, sellerId));
+          if (existing) {
+            this.openChat(existing.id);
+            return;
+          }
+          this.createAndOpen([me, sellerId], 'ONE_TO_ONE');
+        },
+        // Listing is best-effort; if it fails we still open a chat.
+        error: () => this.createAndOpen([me, sellerId], 'ONE_TO_ONE'),
+      });
+  }
+
+  private createAndOpen(participants: number[], chatType: ChatType): void {
     this.chatSvc.createChat({ userIds: participants, chatType }).subscribe({
       next: (chat) => {
         if (!isValidId(chat?.id)) {
